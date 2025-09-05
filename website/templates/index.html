@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Premium Wallpapers</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .wallpaper { margin: 10px; border: 1px solid #ccc; padding: 10px; }
+        .ad { background: #f5f5f5; padding: 15px; margin: 20px 0; border: 1px dashed #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to Premium Wallpapers</h1>
+    <p>Download high-quality wallpapers for free!</p>
+    
+    <div class="ad">
+        <h3>Special Offer!</h3>
+        <p>Get 50% off on our premium wallpaper pack</p>
+        <button onclick="trackAdClick(1)">Click Here</button>
+    </div>
+    
+    <div class="wallpaper">
+        <h3>Nature Wallpaper</h3>
+        <img src="https://via.placeholder.com/800x400" alt="Nature">
+        <p>Beautiful nature scenery</p>
+    </div>
+    
+    <div class="wallpaper">
+        <h3>Abstract Wallpaper</h3>
+        <img src="https://via.placeholder.com/800x400" alt="Abstract">
+        <p>Colorful abstract design</p>
+    </div>
+    
+    <div class="ad">
+        <h3>Limited Time Offer!</h3>
+        <p>Subscribe to our newsletter for daily wallpapers</p>
+        <button onclick="trackAdClick(2)">Subscribe Now</button>
+    </div>
+    
+    <script>
+        function trackAdClick(adId) {
+            fetch(`/ad-click?ad_id=${adId}`)
+                .then(response => response.json())
+                .then(data => {
+                    alert('Thank you for your interest!');
+                });
+        }
+    </script>
+</body>
+</html>

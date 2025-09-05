@@ -1,0 +1,5 @@
+playwright==1.40.0
+playwright-stealth==2.0.1
+flask==3.0.0
+requests==2.31.0
+numpy==1.24.3
