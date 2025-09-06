@@ -76,15 +76,22 @@ def ad_click():
     ip = request.remote_addr
     user_agent = request.headers.get('User-Agent')
     session_id = request.args.get('session_id', 'unknown')
+    referrer = request.headers.get('Referer', 'direct')
+    
+    print(f"Ad click detected - Ad ID: {ad_id}, Session: {session_id}, IP: {ip}")
     
     conn = sqlite3.connect('wallpaper_analytics.db')
     c = conn.cursor()
-    c.execute('INSERT INTO ad_clicks (ip, user_agent, timestamp, ad_id, session_id) VALUES (?, ?, ?, ?, ?)',
-              (ip, user_agent, datetime.now(), ad_id, session_id))
+    c.execute('INSERT INTO ad_clicks (ip, user_agent, timestamp, ad_id, session_id, referrer) VALUES (?, ?, ?, ?, ?, ?)',
+              (ip, user_agent, datetime.now(), ad_id, session_id, referrer))
     conn.commit()
+    
+    # Get updated click count
+    c.execute('SELECT COUNT(*) FROM ad_clicks')
+    total_clicks = c.fetchone()[0]
     conn.close()
     
-    return jsonify({'status': 'success', 'ad_id': ad_id})
+    return jsonify({'status': 'success', 'ad_id': ad_id, 'total_clicks': total_clicks})
 
 @app.route('/analytics')
 def analytics():
@@ -95,17 +102,21 @@ def analytics():
     c.execute('SELECT COUNT(*) FROM visits')
     total_visits = c.fetchone()[0]
     
-    # Get unique visitors
-    c.execute('SELECT COUNT(DISTINCT ip) FROM visits')
+    # Get unique visitors (based on IP + User Agent combination)
+    c.execute('SELECT COUNT(DISTINCT ip || user_agent) FROM visits')
     unique_visitors = c.fetchone()[0]
     
     # Get ad clicks
     c.execute('SELECT COUNT(*) FROM ad_clicks')
     total_clicks = c.fetchone()[0]
     
-    # Get recent visits
+    # Get recent visits with more details
     c.execute('SELECT * FROM visits ORDER BY timestamp DESC LIMIT 50')
     recent_visits = c.fetchall()
+    
+    # Get recent ad clicks
+    c.execute('SELECT * FROM ad_clicks ORDER BY timestamp DESC LIMIT 20')
+    recent_clicks = c.fetchall()
     
     conn.close()
     
@@ -113,7 +124,8 @@ def analytics():
                          total_visits=total_visits,
                          unique_visitors=unique_visitors,
                          total_clicks=total_clicks,
-                         recent_visits=recent_visits)
+                         recent_visits=recent_visits,
+                         recent_clicks=recent_clicks)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

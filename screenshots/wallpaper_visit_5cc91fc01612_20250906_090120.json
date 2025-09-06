@@ -1,0 +1,41 @@
+{
+  "timestamp": "20250906_090120",
+  "session_id": "5cc91fc01612",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
+  "fingerprint": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
+    "canvas": "geometric-bf50e942e9",
+    "webgl": {
+      "vendor": "AMD",
+      "renderer": "AMD Radeon RX 6700 XT",
+      "unmasked_vendor": "AMD",
+      "unmasked_renderer": "AMD Radeon RX 6700 XT"
+    },
+    "fonts": [
+      "Arial",
+      "Times New Roman",
+      "Courier New",
+      "Verdana",
+      "Tahoma",
+      "Segoe UI",
+      "Microsoft Sans Serif",
+      "Calibri",
+      "Cambria"
+    ],
+    "audio": {
+      "frequency": 31797.89256653869,
+      "damping": 0.0028533712236558993
+    },
+    "hardwareConcurrency": 8,
+    "deviceMemory": 4,
+    "platform": "Win32",
+    "screenWidth": 1330,
+    "screenHeight": 1016,
+    "colorDepth": 30,
+    "timezone": "Australia/Sydney",
+    "language": "fr-FR",
+    "session_id": "79512f717bd1"
+  },
+  "proxy": null,
+  "filename": "screenshots/wallpaper_visit_5cc91fc01612_20250906_090120.png"
+}
