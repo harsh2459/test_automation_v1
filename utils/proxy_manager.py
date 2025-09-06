@@ -1,22 +1,22 @@
-# utils/proxy_manager.py
 from utils.proxy_validator import ProxyValidator
 import random
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import json
-
+import os
+from config import config
 
 class AdvancedProxyManager:
     def __init__(self, proxy_sources: Optional[List[str]] = None):
         """Manage loading, validating, and selecting proxies with basic telemetry."""
-        self.proxy_sources = proxy_sources or [
+        self.proxy_sources = proxy_sources or config.get("proxy.sources", [
             "https://www.proxy-list.download/api/v1/get?type=http",
             "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http",
             "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
             "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
             "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies.txt",
-        ]
+        ])
 
         # Start with a couple of known proxies (as dicts!). Will be replaced after validation.
         self.proxies: List[Dict[str, str]] = [
@@ -28,7 +28,44 @@ class AdvancedProxyManager:
         self.last_refresh = datetime.now()
         self.validator = ProxyValidator()
         self.session_proxy_map: Dict[str, Dict] = {}  # session_id -> proxy dict
-        self.load_proxies()
+        self.cache_file = "sessions/proxies_cache.json"
+        self.cache_expiry_hours = config.get("proxy.cache_expiry_hours", 6)
+        self.max_proxies = config.get("proxy.max_proxies", 100)
+        self.load_cached_proxies()
+
+    def load_cached_proxies(self):
+        """Load proxies from cache if valid"""
+        try:
+            if os.path.exists(self.cache_file):
+                with open(self.cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                
+                # Check if cache is still valid
+                cache_time = datetime.fromisoformat(cache_data['cache_time'])
+                if (datetime.now() - cache_time).total_seconds() < self.cache_expiry_hours * 3600:
+                    self.proxies = cache_data['proxies']
+                    self.proxy_stats = cache_data.get('proxy_stats', {})
+                    print(f"Loaded {len(self.proxies)} proxies from cache")
+                    return True
+        except Exception as e:
+            print(f"Error loading proxy cache: {e}")
+        
+        return False
+
+    def save_proxies_to_cache(self):
+        """Save validated proxies to cache"""
+        try:
+            cache_data = {
+                'cache_time': datetime.now().isoformat(),
+                'proxies': self.proxies,
+                'proxy_stats': self.proxy_stats
+            }
+            os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
+            with open(self.cache_file, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            print(f"Saved {len(self.proxies)} proxies to cache")
+        except Exception as e:
+            print(f"Error saving proxy cache: {e}")
 
     def get_proxy_for_session(
         self,
@@ -55,8 +92,16 @@ class AdvancedProxyManager:
             self.session_proxy_map[session_id] = proxy
         return proxy
 
-    def load_proxies(self, max_proxies: int = 100) -> None:
+    def load_proxies(self, max_proxies: Optional[int] = None) -> None:
         """Load and validate proxies from multiple sources, with a maximum limit."""
+        if max_proxies is None:
+            max_proxies = self.max_proxies
+            
+        # Try to load from cache first
+        if self.load_cached_proxies() and len(self.proxies) >= max_proxies * 0.7:
+            print("Using cached proxies")
+            return
+            
         raw_proxies: List[str] = []
 
         # 1) Fetch from remote sources
@@ -92,7 +137,6 @@ class AdvancedProxyManager:
             "216.10.27.159",
             "136.0.207.84",
             "142.147.128.93"
-            # ... add more if you have them
         ]
         raw_proxies.extend(hardcoded_proxies)
 
@@ -140,6 +184,7 @@ class AdvancedProxyManager:
                 }
 
         self.last_refresh = datetime.now()
+        self.save_proxies_to_cache()
 
     def get_proxy(
         self,
@@ -228,12 +273,13 @@ class AdvancedProxyManager:
             self.proxy_stats[key]["ban_count"] += 1
             self.proxy_stats[key]["cooldown_until"] = datetime.now() + timedelta(hours=6)
 
-    def export_stats(self, filename: str = "proxy_stats.json") -> None:
+    def export_stats(self, filename: str = "logs/proxy_stats.json") -> None:
         """Export proxy statistics to a JSON file."""
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self.proxy_stats, f, indent=2, ensure_ascii=False)
 
-    def import_stats(self, filename: str = "proxy_stats.json") -> None:
+    def import_stats(self, filename: str = "logs/proxy_stats.json") -> None:
         """Import proxy statistics from a JSON file (if present)."""
         try:
             with open(filename, "r", encoding="utf-8") as f:

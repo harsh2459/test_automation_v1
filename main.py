@@ -2,6 +2,7 @@ from tasks.example_task import example_navigation, manage_screenshots
 import argparse
 import importlib.util
 import sys
+from utils.monitoring import monitor
 
 # Check if wallpaper_task exists and can be imported
 try:
@@ -26,18 +27,28 @@ def main():
     
     args = parser.parse_args()
     
-    if args.task == 'example':
-        example_navigation()
-    elif args.task == 'wallpaper' and HAVE_WALLPAPER_TASK:
-        wallpaper_site_visit(use_proxy=not args.no_proxy)
-    elif args.task == 'multiple_visits' and HAVE_WALLPAPER_TASK:
-        run_multiple_visits(num_visits=args.visits, delay_between=args.delay, use_proxy=not args.no_proxy)
-    elif args.task == 'screenshots':
-        manage_screenshots(action=args.screenshot_action, filter_session=args.session_id)
-    else:
-        print(f"Unknown task: {args.task}")
-        if args.task in ['wallpaper', 'multiple_visits'] and not HAVE_WALLPAPER_TASK:
-            print("Note: Wallpaper tasks require wallpaper_task.py in the tasks directory")
+    monitor.start_timer("total_execution")
+    
+    try:
+        if args.task == 'example':
+            example_navigation()
+        elif args.task == 'wallpaper' and HAVE_WALLPAPER_TASK:
+            wallpaper_site_visit(use_proxy=not args.no_proxy)
+        elif args.task == 'multiple_visits' and HAVE_WALLPAPER_TASK:
+            run_multiple_visits(num_visits=args.visits, delay_between=args.delay, use_proxy=not args.no_proxy)
+        elif args.task == 'screenshots':
+            manage_screenshots(action=args.screenshot_action, filter_session=args.session_id)
+        else:
+            print(f"Unknown task: {args.task}")
+            if args.task in ['wallpaper', 'multiple_visits'] and not HAVE_WALLPAPER_TASK:
+                print("Note: Wallpaper tasks require wallpaper_task.py in the tasks directory")
+    except Exception as e:
+        monitor.log_event("main_execution_error", {"error": str(e)}, level="ERROR")
+        print(f"Error during execution: {e}")
+    finally:
+        duration = monitor.end_timer("total_execution")
+        monitor.log_event("total_execution_completed", {"duration": duration})
+        monitor.save_report()
 
 if __name__ == "__main__":
     main()

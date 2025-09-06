@@ -7,6 +7,8 @@ import hashlib
 from datetime import datetime
 import re
 from utils.session_manager import SessionManager
+from utils.monitoring import monitor
+from config import config
 
 try:
     from playwright_stealth import stealth_sync
@@ -14,9 +16,27 @@ try:
 except ImportError:
     HAVE_STEALTH = False
 
+def retry_on_failure(max_retries=3, delay=1, backoff=2, exceptions=(Exception,)):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries, current_delay = max_retries, delay
+            while retries > 0:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    retries -= 1
+                    if retries == 0:
+                        print(f"Function {func.__name__} failed after {max_retries} attempts: {e}")
+                        raise
+                    print(f"Function {func.__name__} failed: {e}. Retrying in {current_delay} seconds...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+        return wrapper
+    return decorator
+
 class BrowserEngine:
-    def __init__(self, headless=False, proxy=None, user_agent=None, fingerprint=None, session_id=None):
-        self.headless = headless
+    def __init__(self, headless=None, proxy=None, user_agent=None, fingerprint=None, session_id=None, target_url=None):
+        self.headless = headless if headless is not None else config.get("browser.headless", False)
         self.proxy = proxy
         self.user_agent = user_agent or self.get_random_user_agent()
         self.fingerprint = fingerprint or {}
@@ -24,11 +44,11 @@ class BrowserEngine:
         self.browser = None
         self.context = None
         self.page = None
-        self.session_id = hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
+        self.session_id = session_id or hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
         self.proxy_manager = None
         self.geolocation = self._generate_geolocation()
-        self.session_id = session_id or hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
         self.session_manager = SessionManager()
+        self.target_url = target_url
 
     def _generate_geolocation(self):
         """Generate realistic geolocation data"""
@@ -59,39 +79,29 @@ class BrowserEngine:
         }
     
     def get_random_user_agent(self):
-        """Get a more diverse set of user agents"""
-        user_agents = [
-            # Chrome Windows
+        """Get a user agent from config or use default list"""
+        user_agents = config.get("browser.user_agents", [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
-            
-            # Chrome macOS
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
-            
-            # Firefox Windows
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:96.0) Gecko/20100101 Firefox/96.0",
-            
-            # Firefox macOS
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 Firefox/95.0",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:96.0) Gecko/20100101 Firefox/96.0",
-            
-            # Safari
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
-            
-            # Edge
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
-        ]
+        ])
         return random.choice(user_agents)
     
+    @retry_on_failure(max_retries=3, delay=2, backoff=2)
     def launch_browser(self, retry_count=3):
         """Launch browser with advanced stealth and proxy rotation"""
         for attempt in range(retry_count):
             try:
+                # Check if we're accessing localhost and disable proxy if so
+                if self.target_url and any(domain in self.target_url for domain in ['localhost', '127.0.0.1']):
+                    print("Localhost detected, disabling proxy usage")
+                    self.proxy = None
+                
                 # Rotate proxy if we have a proxy manager
                 if self.proxy_manager and not self.proxy:
-                     # Use session-based proxy selection
                     self.proxy = self.proxy_manager.get_proxy_for_session(self.session_id)
                     if not self.proxy:
                         print("No proxies available, proceeding without proxy")
@@ -135,8 +145,8 @@ class BrowserEngine:
                 # Set up context with randomized settings
                 context_options = {
                     "viewport": {
-                        "width": random.randint(1000, 1920),  # Wider range for messiness
-                        "height": random.randint(600, 1080)   # Wider range for messiness
+                        "width": config.get("browser.viewport_width", random.randint(1000, 1920)),
+                        "height": config.get("browser.viewport_height", random.randint(600, 1080))
                     },
                     "user_agent": self.user_agent,
                     "locale": self._get_language_from_ua(),
@@ -152,6 +162,7 @@ class BrowserEngine:
                 storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
                 if os.path.exists(storage_state_path):
                     context_options["storage_state"] = storage_state_path
+                
                 # Set HTTP headers for more realism
                 context_options["extra_http_headers"] = self._generate_http_headers()
                 
@@ -167,9 +178,20 @@ class BrowserEngine:
                 # Apply fingerprint overrides
                 self._apply_fingerprint_overrides()
                 
+                # Simulate network conditions
+                self._simulate_network_conditions()
+                
                 print(f"Browser launched successfully with session ID: {self.session_id}")
                 if self.proxy:
                     print(f"Using proxy: {self.proxy.get('server', 'Unknown')}")
+                
+                # Log the browser launch
+                monitor.log_event("browser_launched", {
+                    "session_id": self.session_id,
+                    "user_agent": self.user_agent,
+                    "proxy": self.proxy,
+                    "geolocation": self.geolocation
+                })
                 
                 return self.page
                 
@@ -227,130 +249,114 @@ class BrowserEngine:
     
     def _apply_advanced_stealth(self):
         """Apply advanced stealth techniques to avoid detection"""
-        stealth_script = """
+        # Get stealth configuration
+        webgl_vendor = config.get("stealth.webgl_vendor", "Google Inc.")
+        webgl_renderer = config.get("stealth.webgl_renderer", "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)")
+        hardware_concurrency = config.get("stealth.hardware_concurrency", 8)
+        device_memory = config.get("stealth.device_memory", 8)
+        
+        stealth_script = f"""
         // Override navigator properties
-        Object.defineProperty(navigator, 'webdriver', {
+        Object.defineProperty(navigator, 'webdriver', {{
             get: () => false,
-        });
+        }});
         
-        // Override permissions
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters) => (
-            parameters.name === 'notifications' ?
-                Promise.resolve({ state: Notification.permission }) :
-                originalQuery(parameters)
-        );
-
-        // Override plugins
-        Object.defineProperty(navigator, 'plugins', {
-            get: () => [{
-                name: 'Chrome PDF Plugin',
-                filename: 'internal-pdf-viewer',
-                description: 'Portable Document Format'
-            }, {
-                name: 'Chrome PDF Viewer',
-                filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
-                description: ''
-            }, {
-                name: 'Native Client',
-                filename: 'internal-nacl-plugin',
-                description: ''
-            }],
-        });
-
-        // Override languages
-        Object.defineProperty(navigator, 'languages', {
-            get: () => ['%s'],
-        });
+        // Override plugins with more realistic data
+        Object.defineProperty(navigator, 'plugins', {{
+            get: () => {json.dumps(self._generate_plugins_list())},
+        }});
         
-        // Override chrome object
-        window.chrome = {
-            app: {
-                isInstalled: false,
-            },
-            webstore: {
-                onInstallStageChanged: {},
-                onDownloadProgress: {},
-            },
-            runtime: {
-                PlatformOs: {
-                    MAC: 'mac',
-                    WIN: 'win',
-                    ANDROID: 'android',
-                    CROS: 'cros',
-                    LINUX: 'linux',
-                    OPENBSD: 'openbsd',
-                },
-                PlatformArch: {
-                    ARM: 'arm',
-                    X86_32: 'x86-32',
-                    X86_64: 'x86-64',
-                },
-                PlatformNaclArch: {
-                    ARM: 'arm',
-                    X86_32: 'x86-32',
-                    X86_64: 'x86-64',
-                },
-                RequestUpdateCheckStatus: {
-                    THROTTLED: 'throttled',
-                    NO_UPDATE: 'no_update',
-                    UPDATE_AVAILABLE: 'update_available',
-                },
-                OnInstalledReason: {
-                    INSTALL: 'install',
-                    UPDATE: 'update',
-                    CHROME_UPDATE: 'chrome_update',
-                    SHARED_MODULE_UPDATE: 'shared_module_update',
-                },
-                OnRestartRequiredReason: {
-                    APP_UPDATE: 'app_update',
-                    OS_UPDATE: 'os_update',
-                    PERIODIC: 'periodic',
-                },
-            },
-        };
+        // Override hardware properties
+        Object.defineProperty(navigator, 'hardwareConcurrency', {{
+            get: () => {hardware_concurrency},
+        }});
         
-        // Mock media devices
-        Object.defineProperty(navigator, 'mediaDevices', {
-            get: () => ({
-                enumerateDevices: () => Promise.resolve([
-                    { kind: 'audioinput', deviceId: 'default', label: '', groupId: '' },
-                    { kind: 'videoinput', deviceId: 'default', label: '', groupId: '' },
-                ]),
-                getUserMedia: () => Promise.resolve({}),
-            }),
-        });
+        Object.defineProperty(navigator, 'deviceMemory', {{
+            get: () => {device_memory},
+        }});
         
-        // Mock battery API
-        Object.defineProperty(navigator, 'getBattery', {
-            get: () => () => Promise.resolve({
-                level: 0.%d,
-                charging: %s,
-                chargingTime: %d,
-                dischargingTime: Infinity,
-            }),
-        });
+        // Mock WebGL properties
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter) {{
+            if (parameter === 37445) {{
+                return '{webgl_vendor}';
+            }}
+            if (parameter === 37446) {{
+                return '{webgl_renderer}';
+            }}
+            return getParameter.call(this, parameter);
+        }};
         
-        // Mock connection API
-        Object.defineProperty(navigator, 'connection', {
-            get: () => ({
-                downlink: %d,
-                effectiveType: '%s',
-                rtt: %d,
-                saveData: false,
-            }),
-        });
-        """ % (
-            self._get_language_from_ua(),
-            random.randint(10, 99),
-            str(random.random() < 0.3).lower(),
-            random.randint(1800, 3600),
-            random.uniform(1, 100),
-            random.choice(['4g', '3g', '2g']),
-            random.randint(50, 200)
-        )
+        // Mock performance metrics
+        const originalGetEntries = performance.getEntriesByType;
+        performance.getEntriesByType = function(type) {{
+            if (type === 'navigation') {{
+                const navEntries = originalGetEntries.call(this, type);
+                if (navEntries.length > 0) {{
+                    // Add some randomness to timing metrics
+                    navEntries[0].domContentLoadedEventEnd += Math.random() * 100;
+                    navEntries[0].loadEventEnd += Math.random() * 200;
+                }}
+                return navEntries;
+            }}
+            return originalGetEntries.call(this, type);
+        }};
+        
+        // Mock timezone
+        Object.defineProperty(Intl.DateTimeFormat.prototype, 'resolvedOptions', {{
+            get: () => function() {{
+                const options = Reflect.apply(Intl.DateTimeFormat.prototype.resolvedOptions, this, arguments);
+                options.timeZone = '{self.fingerprint.get('timezone', 'America/New_York')}';
+                return options;
+            }}
+        }});
+        
+        // Mock media devices with more variability
+        Object.defineProperty(navigator, 'mediaDevices', {{
+            get: () => ({{
+                enumerateDevices: () => Promise.resolve({json.dumps(self._generate_media_devices())}),
+                getUserMedia: () => Promise.resolve({{}}),
+            }}),
+        }});
+        """
         
         self.page.add_init_script(stealth_script)
+    
+    def _generate_plugins_list(self):
+        """Generate a realistic plugins list based on browser fingerprint"""
+        plugins = [
+            {"name": "Chrome PDF Plugin", "filename": "internal-pdf-viewer", "description": "Portable Document Format"},
+            {"name": "Chrome PDF Viewer", "filename": "mhjfbmdgcfjbbpaeojofohoefgiehjai", "description": ""},
+            {"name": "Native Client", "filename": "internal-nacl-plugin", "description": ""},
+        ]
+        
+        # Add some randomness
+        if random.random() < 0.3:
+            plugins.append({
+                "name": "Widevine Content Decryption Module",
+                "filename": "widevinecdmadapter.plugin",
+                "description": "Widevine Content Decryption Module"
+            })
+        
+        return plugins
+    
+    def _generate_media_devices(self):
+        """Generate realistic media devices"""
+        devices = [
+            {"kind": "audioinput", "deviceId": "default", "label": "", "groupId": "default-group"},
+            {"kind": "videoinput", "deviceId": "default", "label": "", "groupId": "default-group"},
+        ]
+        
+        # Sometimes add additional devices
+        if random.random() < 0.4:
+            devices.append({
+                "kind": "audiooutput", 
+                "deviceId": "default", 
+                "label": "", 
+                "groupId": "default-group"
+            })
+        
+        return devices
     
     def _apply_fingerprint_overrides(self):
         """Apply JavaScript overrides to mask automation and spoof fingerprint"""
@@ -399,6 +405,36 @@ class BrowserEngine:
         """
         
         self.page.add_init_script(fingerprint_script)
+    
+    def _simulate_network_conditions(self):
+        """Simulate realistic network conditions"""
+        # Only apply network throttling if not in headless mode
+        if not self.headless:
+            conditions = [
+                {"download": 1024, "upload": 512, "latency": 100},  # Regular 3G
+                {"download": 2048, "upload": 1024, "latency": 50},  # Good 3G
+                {"download": 4096, "upload": 2048, "latency": 20},  # Regular 4G
+            ]
+            
+            # Select a random network condition
+            network_condition = random.choice(conditions)
+            self.context.set_offline(False)
+            self.context.emulate_network_conditions(network_condition)
+    
+    def _randomize_geolocation(self):
+        """Randomize geolocation for each session"""
+        # Override the initial geolocation with more randomness
+        self.geolocation = {
+            "latitude": random.uniform(-90, 90),
+            "longitude": random.uniform(-180, 180),
+            "accuracy": random.uniform(10, 5000),  # Wider accuracy range
+            "country": random.choice(["US", "UK", "DE", "FR", "CA", "AU", "JP"]),
+            "city": random.choice(["New York", "London", "Berlin", "Paris", "Toronto", "Sydney", "Tokyo"]),
+            "timezone": random.choice([
+                "America/New_York", "Europe/London", "Europe/Berlin", 
+                "Europe/Paris", "America/Toronto", "Australia/Sydney", "Asia/Tokyo"
+            ])
+        }
     
     def save_screenshot(self, name="screenshot", include_fingerprint=True):
         """Save screenshot with optional fingerprint metadata"""

@@ -6,6 +6,9 @@ import random
 from urllib.parse import urlencode
 from utils.session_manager import SessionManager
 from utils.proxy_manager import AdvancedProxyManager
+from datetime import datetime
+from config import config
+from utils.monitoring import monitor
 
 def _simulate_ad_interaction(page, session_id, behavior_simulator):
     """Simulate ad interactions with multiple approaches"""
@@ -138,6 +141,7 @@ def _simulate_wallpaper_interaction(page, behavior_simulator):
 
 def wallpaper_site_visit(use_proxy=True, session_id=None):
     print("Starting wallpaper site visit task...")
+    monitor.start_timer("wallpaper_visit")
     
     # Initialize session manager
     session_manager = SessionManager()
@@ -147,14 +151,20 @@ def wallpaper_site_visit(use_proxy=True, session_id=None):
     fingerprint = fp_manager.get_comprehensive_fingerprint()
     user_agent = fingerprint["user_agent"]
     
-    # Initialize proxy manager if needed - UPDATED SECTION
+    # Define site URL early to check if it's localhost
+    site_url = "http://localhost:5000"
+    
+    # Initialize proxy manager if needed - but skip for localhost
     proxy_manager = None
     proxy = None
-    if use_proxy:
+    
+    # Don't use proxy for localhost connections
+    if use_proxy and "localhost" not in site_url:
         try:
             proxy_manager = AdvancedProxyManager()
-            # Limit to 100 proxies maximum
-            proxy_manager.load_proxies(max_proxies=100)
+            # Use configured max proxies
+            max_proxies = config.get("proxy.max_proxies", 100)
+            proxy_manager.load_proxies(max_proxies=max_proxies)
             proxy = proxy_manager.get_proxy_for_session(session_id or fingerprint['session_id'])
             
             # If no valid proxy found, fall back to direct connection
@@ -165,14 +175,17 @@ def wallpaper_site_visit(use_proxy=True, session_id=None):
         except Exception as e:
             print(f"Proxy setup failed: {e}, falling back to direct connection")
             proxy = None
+    else:
+        print("Localhost detected, disabling proxy usage")
     
     # Initialize browser engine
     browser_engine = BrowserEngine(
-        headless=False,
+        headless=config.get("browser.headless", False),
         proxy=proxy,
         user_agent=user_agent,
         fingerprint=fingerprint,
-        session_id=session_id or fingerprint['session_id']  # Use provided session_id or generate new
+        session_id=session_id or fingerprint['session_id'],  # Use provided session_id or generate new
+        target_url=site_url  # Pass the target URL for localhost detection
     )
     
     # Initialize behavior simulator
@@ -188,9 +201,10 @@ def wallpaper_site_visit(use_proxy=True, session_id=None):
         print(f"Using fingerprint: {fingerprint['session_id']}")
         if proxy:
             print(f"Using proxy: {proxy.get('server', 'Unknown')}")
+        else:
+            print("Using direct connection (no proxy)")
         
         # Navigate to the wallpaper site with proper parameters
-        site_url = "http://localhost:5000"
         params = {
             "session_id": session_id,
             "fingerprint": fingerprint.get('session_id', 'unknown')
@@ -229,11 +243,28 @@ def wallpaper_site_visit(use_proxy=True, session_id=None):
         }
         session_manager.save_session_data(session_id, session_data)
         
+        duration = monitor.end_timer("wallpaper_visit")
+        monitor.log_event("wallpaper_visit_completed", {
+            "session_id": session_id,
+            "duration": duration,
+            "ad_clicked": ad_clicked,
+            "wallpaper_interacted": wallpaper_interacted,
+            "screenshot_path": screenshot_path
+        })
+        
         print("Wallpaper site visit completed successfully")
         return session_id
         
     except Exception as e:
+        duration = monitor.end_timer("wallpaper_visit")
+        monitor.log_event("wallpaper_visit_failed", {
+            "session_id": session_id,
+            "duration": duration,
+            "error": str(e)
+        }, level="ERROR")
         print(f"Error during wallpaper site visit: {e}")
+        import traceback
+        traceback.print_exc()
         
     finally:
         browser_engine.close()
@@ -267,3 +298,6 @@ def run_multiple_visits(num_visits=5, delay_between=30, use_proxy=True):
             wait_time = random.randint(int(base_delay * 0.7), int(base_delay * 1.3))
             print(f"Waiting {wait_time} seconds before next visit...")
             time.sleep(wait_time)
+    
+    # Save performance report after all visits
+    monitor.save_report()

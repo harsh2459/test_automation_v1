@@ -1,7 +1,0 @@
-[
-  {
-    "server": "http://your-real-proxy-ip:port",
-    "username": "your-username",
-    "password": "your-password"
-  }
-]
