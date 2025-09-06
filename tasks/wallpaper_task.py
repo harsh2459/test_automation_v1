@@ -4,6 +4,8 @@ from human_behavior import AdvancedBehaviorSimulator
 import time
 import random
 from urllib.parse import urlencode
+from utils.session_manager import SessionManager
+from utils.proxy_manager import AdvancedProxyManager
 
 def _simulate_ad_interaction(page, session_id, behavior_simulator):
     """Simulate ad interactions with multiple approaches"""
@@ -134,19 +136,43 @@ def _simulate_wallpaper_interaction(page, behavior_simulator):
     
     return False
 
-def wallpaper_site_visit():
+def wallpaper_site_visit(use_proxy=True, session_id=None):
     print("Starting wallpaper site visit task...")
+    
+    # Initialize session manager
+    session_manager = SessionManager()
     
     # Generate fingerprint
     fp_manager = FingerprintManager()
     fingerprint = fp_manager.get_comprehensive_fingerprint()
     user_agent = fingerprint["user_agent"]
     
+    # Initialize proxy manager if needed - UPDATED SECTION
+    proxy_manager = None
+    proxy = None
+    if use_proxy:
+        try:
+            proxy_manager = AdvancedProxyManager()
+            # Limit to 100 proxies maximum
+            proxy_manager.load_proxies(max_proxies=100)
+            proxy = proxy_manager.get_proxy_for_session(session_id or fingerprint['session_id'])
+            
+            # If no valid proxy found, fall back to direct connection
+            if not proxy or not proxy.get("server"):
+                print("No valid proxies found, falling back to direct connection")
+                proxy = None
+                
+        except Exception as e:
+            print(f"Proxy setup failed: {e}, falling back to direct connection")
+            proxy = None
+    
     # Initialize browser engine
     browser_engine = BrowserEngine(
         headless=False,
+        proxy=proxy,
         user_agent=user_agent,
-        fingerprint=fingerprint
+        fingerprint=fingerprint,
+        session_id=session_id or fingerprint['session_id']  # Use provided session_id or generate new
     )
     
     # Initialize behavior simulator
@@ -160,6 +186,8 @@ def wallpaper_site_visit():
         session_id = browser_engine.session_id
         print(f"Using session ID: {session_id}")
         print(f"Using fingerprint: {fingerprint['session_id']}")
+        if proxy:
+            print(f"Using proxy: {proxy.get('server', 'Unknown')}")
         
         # Navigate to the wallpaper site with proper parameters
         site_url = "http://localhost:5000"
@@ -171,22 +199,8 @@ def wallpaper_site_visit():
         # Build URL with parameters
         url_with_params = f"{site_url}?{urlencode(params)}"
         
-        print(f"Navigating to: {url_with_params}")
-        page.goto(url_with_params, wait_until="networkidle")
-        
-        # Simulate human reading time based on pattern
-        pattern_settings = behavior_simulator.action_patterns[behavior_pattern]
-        reading_time = random.lognormvariate(
-            pattern_settings["reading_time_mean"], 
-            pattern_settings["reading_time_std"]
-        )
-        
-        # Cap the reading time to a maximum of 5 seconds
-        max_reading_time = 5
-        capped_reading_time = min(reading_time, max_reading_time)
-        
-        print(f"Simulating reading time: {capped_reading_time:.2f} seconds")
-        time.sleep(capped_reading_time)  # Use the capped time
+        # Use the new natural browsing method
+        behavior_simulator.simulate_natural_browsing(page, url_with_params, session_id)
         
         # Enhanced ad clicking simulation
         ad_clicked = _simulate_ad_interaction(page, session_id, behavior_simulator)
@@ -200,14 +214,23 @@ def wallpaper_site_visit():
         if wallpaper_interacted:
             print("Successfully interacted with wallpaper content")
         
-        # Simulate some scrolling
-        behavior_simulator.simulate_scrolling(page, random.randint(500, 1500))
-        
         # Take a screenshot
         screenshot_path = browser_engine.save_screenshot("wallpaper_visit", include_fingerprint=True)
         print(f"Screenshot saved: {screenshot_path}")
         
+        # Save session data
+        session_data = {
+            "session_id": session_id,
+            "fingerprint": fingerprint,
+            "user_agent": user_agent,
+            "proxy": proxy,
+            "last_activity": datetime.now().isoformat(),
+            "visit_count": 1  # Will be incremented on subsequent visits
+        }
+        session_manager.save_session_data(session_id, session_data)
+        
         print("Wallpaper site visit completed successfully")
+        return session_id
         
     except Exception as e:
         print(f"Error during wallpaper site visit: {e}")
@@ -215,13 +238,25 @@ def wallpaper_site_visit():
     finally:
         browser_engine.close()
 
-def run_multiple_visits(num_visits=5, delay_between=30):
-    """Run multiple visits to the wallpaper site"""
+def run_multiple_visits(num_visits=5, delay_between=30, use_proxy=True):
+    """Run multiple visits to the wallpaper site with session persistence"""
+    session_manager = SessionManager()
+    session_id = None
+    
     for i in range(num_visits):
         print(f"Starting visit {i+1}/{num_visits}")
         start_time = time.time()
         
-        wallpaper_site_visit()
+        # Load previous session data if exists
+        session_data = {}
+        if session_id:
+            session_data = session_manager.load_session_data(session_id)
+            if session_data:
+                session_data["visit_count"] = session_data.get("visit_count", 0) + 1
+                print(f"Resuming session {session_id}, visit count: {session_data['visit_count']}")
+        
+        # Run the visit
+        session_id = wallpaper_site_visit(use_proxy=use_proxy, session_id=session_id)
         
         visit_duration = time.time() - start_time
         print(f"Visit completed in {visit_duration:.2f} seconds")

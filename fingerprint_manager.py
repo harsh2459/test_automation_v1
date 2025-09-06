@@ -11,7 +11,31 @@ class FingerprintManager:
         self.audio_profiles = self._load_audio_profiles()
     
     def get_comprehensive_fingerprint(self) -> Dict:
-        """Generate a complete browser fingerprint"""
+        """Generate a complete browser fingerprint with more variability"""
+        # Create a more "messy" fingerprint with intentional slight inconsistencies
+        platforms = ["Win32", "MacIntel", "Linux x86_64"]
+        chosen_platform = random.choice(platforms)
+        
+        # Sometimes create slight inconsistencies (like real browsers)
+        if random.random() < 0.2:  # 20% chance of inconsistency
+            if chosen_platform == "Win32":
+                user_agent = random.choice([
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+                    "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
+                ])
+            elif chosen_platform == "MacIntel":
+                user_agent = random.choice([
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
+                ])
+            else:  # Linux
+                user_agent = random.choice([
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+                    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0"
+                ])
+        else:
+            user_agent = self.get_random_user_agent()
         return {
             "user_agent": self.get_random_user_agent(),
             "canvas": self.generate_canvas_fingerprint(),

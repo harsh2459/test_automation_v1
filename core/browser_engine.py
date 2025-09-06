@@ -6,6 +6,7 @@ import json
 import hashlib
 from datetime import datetime
 import re
+from utils.session_manager import SessionManager
 
 try:
     from playwright_stealth import stealth_sync
@@ -14,7 +15,7 @@ except ImportError:
     HAVE_STEALTH = False
 
 class BrowserEngine:
-    def __init__(self, headless=False, proxy=None, user_agent=None, fingerprint=None):
+    def __init__(self, headless=False, proxy=None, user_agent=None, fingerprint=None, session_id=None):
         self.headless = headless
         self.proxy = proxy
         self.user_agent = user_agent or self.get_random_user_agent()
@@ -26,7 +27,9 @@ class BrowserEngine:
         self.session_id = hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
         self.proxy_manager = None
         self.geolocation = self._generate_geolocation()
-        
+        self.session_id = session_id or hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
+        self.session_manager = SessionManager()
+
     def _generate_geolocation(self):
         """Generate realistic geolocation data"""
         cities = {
@@ -87,8 +90,9 @@ class BrowserEngine:
         for attempt in range(retry_count):
             try:
                 # Rotate proxy if we have a proxy manager
-                if self.proxy_manager:
-                    self.proxy = self.proxy_manager.get_proxy()
+                if self.proxy_manager and not self.proxy:
+                     # Use session-based proxy selection
+                    self.proxy = self.proxy_manager.get_proxy_for_session(self.session_id)
                     if not self.proxy:
                         print("No proxies available, proceeding without proxy")
                 
@@ -131,8 +135,8 @@ class BrowserEngine:
                 # Set up context with randomized settings
                 context_options = {
                     "viewport": {
-                        "width": random.randint(1200, 1920),
-                        "height": random.randint(800, 1080)
+                        "width": random.randint(1000, 1920),  # Wider range for messiness
+                        "height": random.randint(600, 1080)   # Wider range for messiness
                     },
                     "user_agent": self.user_agent,
                     "locale": self._get_language_from_ua(),
@@ -145,6 +149,9 @@ class BrowserEngine:
                     "permissions": ["geolocation"]
                 }
                 
+                storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
+                if os.path.exists(storage_state_path):
+                    context_options["storage_state"] = storage_state_path
                 # Set HTTP headers for more realism
                 context_options["extra_http_headers"] = self._generate_http_headers()
                 
@@ -424,13 +431,16 @@ class BrowserEngine:
     def close(self):
         try:
             if self.context:
+                storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
+                self.context.storage_state(path=storage_state_path)
                 self.context.close()
             if self.browser:
                 self.browser.close()
             if self.playwright:
                 self.playwright.stop()
-        except:
-            pass
+            
+        except Exception as e:
+             print(f"Error during browser close: {e}")
     
     def simulate_human_behavior(self, page=None):
         """Simulate human-like behavior on the page"""

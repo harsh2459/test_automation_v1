@@ -9,6 +9,75 @@ class AdvancedBehaviorSimulator:
         self.action_patterns = self._load_behavior_patterns()
         self.last_action_time = 0
         self.action_history = []
+        self.noise_sites = [  # Sites for background noise
+            "https://news.google.com",
+            "https://www.reddit.com",
+            "https://www.youtube.com",
+            "https://www.amazon.com",
+            "https://www.wikipedia.org",
+        ]
+    def random_pause(self, min_delay=1, max_delay=4):
+        """Sleep for a random time between min_delay and max_delay seconds"""
+        time.sleep(random.uniform(min_delay, max_delay))
+    
+    def simulate_background_noise(self, page, session_id):
+        """Simulate background noise by visiting harmless sites"""
+        # Visit 1-3 random noise sites
+        for _ in range(random.randint(1, 3)):
+            site = random.choice(self.noise_sites)
+            try:
+                print(f"Visiting background noise site: {site}")
+                page.goto(site, timeout=30000, wait_until="domcontentloaded")
+                # Simulate some activity on the site
+                self.simulate_scrolling(page, random.randint(300, 1000))
+                self.random_pause(2, 5)
+            except Exception as e:
+                print(f"Background noise site {site} failed: {e}")
+    
+    def simulate_natural_browsing(self, page, main_url, session_id):
+        """Simulate a natural browsing pattern with background noise and pauses"""
+        # Start with some background noise
+        if random.random() < 0.7:  # 70% chance to do background noise first
+            self.simulate_background_noise(page, session_id)
+        
+        # Go to the main target
+        print(f"Navigating to main target: {main_url}")
+        page.goto(main_url, timeout=60000, wait_until="domcontentloaded") 
+        
+        # Random pause after loading
+        self.random_pause(1, 3)
+        
+        # Simulate reading/consuming content
+        pattern_settings = self.action_patterns[self.get_random_pattern()]
+        reading_time = random.lognormvariate(
+            pattern_settings["reading_time_mean"], 
+            pattern_settings["reading_time_std"]
+        )
+        reading_time = min(reading_time, 120)  # Cap at 2 minutes
+        print(f"Simulating reading time: {reading_time:.2f} seconds")
+        time.sleep(reading_time)
+        
+        # More interactions with random pauses
+        for _ in range(random.randint(2, 5)):
+            # Random action: scroll, click, or pause
+            action = random.choice(["scroll", "click", "pause"])
+            if action == "scroll":
+                self.simulate_scrolling(page, random.randint(200, 800))
+            elif action == "click":
+                # Try to find and click a random element
+                selectors = ["a", "button", ".btn", "[class*='button']"]
+                for selector in selectors:
+                    elements = page.query_selector_all(selector)
+                    if elements:
+                        random.choice(elements).click()
+                        self.random_pause(1, 3)
+                        break
+            else:  # pause
+                self.random_pause(2, 5)
+        
+        # Sometimes more background noise after main activity
+        if random.random() < 0.3:  # 30% chance
+            self.simulate_background_noise(page, session_id)
     
     def simulate_mouse_movement(self, page, start_x, start_y, end_x, end_y):
         """Simulate human-like mouse movement with acceleration curves"""

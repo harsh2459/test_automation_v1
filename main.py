@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--headless', action='store_true', help='Run in headless mode')
     parser.add_argument('--screenshot-action', type=str, default='list', help='Screenshot action (list, clean)')
     parser.add_argument('--session-id', type=str, help='Session ID for screenshot management')
+    parser.add_argument('--no-proxy', action='store_true', help='Disable proxy usage')
     
     # Add arguments for wallpaper tasks if available
     if HAVE_WALLPAPER_TASK:
@@ -28,9 +29,9 @@ def main():
     if args.task == 'example':
         example_navigation()
     elif args.task == 'wallpaper' and HAVE_WALLPAPER_TASK:
-        wallpaper_site_visit()
+        wallpaper_site_visit(use_proxy=not args.no_proxy)
     elif args.task == 'multiple_visits' and HAVE_WALLPAPER_TASK:
-        run_multiple_visits(num_visits=args.visits, delay_between=args.delay)
+        run_multiple_visits(num_visits=args.visits, delay_between=args.delay, use_proxy=not args.no_proxy)
     elif args.task == 'screenshots':
         manage_screenshots(action=args.screenshot_action, filter_session=args.session_id)
     else:

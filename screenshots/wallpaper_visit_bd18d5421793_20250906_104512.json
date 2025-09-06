@@ -1,0 +1,41 @@
+{
+  "timestamp": "20250906_104512",
+  "session_id": "bd18d5421793",
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+  "fingerprint": {
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+    "canvas": "normal-78b2ab189b",
+    "webgl": {
+      "vendor": "Intel Inc.",
+      "renderer": "Intel Iris Xe Graphics",
+      "unmasked_vendor": "Intel Inc.",
+      "unmasked_renderer": "Intel Iris Xe Graphics"
+    },
+    "fonts": [
+      "Arial",
+      "Times New Roman",
+      "Courier New",
+      "Verdana",
+      "Tahoma",
+      "Segoe UI",
+      "Microsoft Sans Serif",
+      "Calibri",
+      "Cambria"
+    ],
+    "audio": {
+      "frequency": 43581.136520273045,
+      "damping": 0.0019731343761044064
+    },
+    "hardwareConcurrency": 16,
+    "deviceMemory": 4,
+    "platform": "Win32",
+    "screenWidth": 1737,
+    "screenHeight": 819,
+    "colorDepth": 30,
+    "timezone": "America/Denver",
+    "language": "ru-RU",
+    "session_id": "67b15d72538b"
+  },
+  "proxy": null,
+  "filename": "screenshots/wallpaper_visit_bd18d5421793_20250906_104512.png"
+}

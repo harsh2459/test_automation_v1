@@ -1,0 +1,41 @@
+{
+  "timestamp": "20250906_104431",
+  "session_id": "71432920242a",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
+  "fingerprint": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
+    "canvas": "normal-4a6d26509c",
+    "webgl": {
+      "vendor": "NVIDIA Corporation",
+      "renderer": "NVIDIA GeForce RTX 3060/PCIe/SSE2",
+      "unmasked_vendor": "NVIDIA Corporation",
+      "unmasked_renderer": "NVIDIA GeForce RTX 3060/PCIe/SSE2"
+    },
+    "fonts": [
+      "Arial",
+      "Times New Roman",
+      "Courier New",
+      "Verdana",
+      "Tahoma",
+      "Segoe UI",
+      "Microsoft Sans Serif",
+      "Calibri",
+      "Cambria"
+    ],
+    "audio": {
+      "frequency": 50301.088243826816,
+      "damping": 0.0015057654130797675
+    },
+    "hardwareConcurrency": 4,
+    "deviceMemory": 8,
+    "platform": "MacIntel",
+    "screenWidth": 1341,
+    "screenHeight": 1058,
+    "colorDepth": 30,
+    "timezone": "Asia/Kolkata",
+    "language": "pt-BR",
+    "session_id": "039cef2d34b5"
+  },
+  "proxy": null,
+  "filename": "screenshots/wallpaper_visit_71432920242a_20250906_104431.png"
+}

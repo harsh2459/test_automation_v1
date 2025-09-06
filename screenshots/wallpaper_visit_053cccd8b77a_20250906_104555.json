@@ -1,0 +1,41 @@
+{
+  "timestamp": "20250906_104555",
+  "session_id": "053cccd8b77a",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
+  "fingerprint": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
+    "canvas": "gradient-19b74b95ac",
+    "webgl": {
+      "vendor": "Apple Inc.",
+      "renderer": "Apple M1 Pro",
+      "unmasked_vendor": "Apple Inc.",
+      "unmasked_renderer": "Apple M1 Pro"
+    },
+    "fonts": [
+      "Arial",
+      "Times New Roman",
+      "Courier New",
+      "Verdana",
+      "Tahoma",
+      "Segoe UI",
+      "Microsoft Sans Serif",
+      "Calibri",
+      "Cambria"
+    ],
+    "audio": {
+      "frequency": 42678.05680387997,
+      "damping": 0.002088848941395825
+    },
+    "hardwareConcurrency": 6,
+    "deviceMemory": 8,
+    "platform": "Win32",
+    "screenWidth": 1346,
+    "screenHeight": 854,
+    "colorDepth": 30,
+    "timezone": "Asia/Tokyo",
+    "language": "pt-BR",
+    "session_id": "b99ec58db02a"
+  },
+  "proxy": null,
+  "filename": "screenshots/wallpaper_visit_053cccd8b77a_20250906_104555.png"
+}
