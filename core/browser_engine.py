@@ -5,6 +5,7 @@ import os
 import json
 import hashlib
 from datetime import datetime
+import re
 
 try:
     from playwright_stealth import stealth_sync
@@ -24,18 +25,59 @@ class BrowserEngine:
         self.page = None
         self.session_id = hashlib.md5(str(time.time()).encode()).hexdigest()[:12]
         self.proxy_manager = None
+        self.geolocation = self._generate_geolocation()
         
-    def set_proxy_manager(self, proxy_manager):
-        """Set proxy manager for automatic rotation"""
-        self.proxy_manager = proxy_manager
+    def _generate_geolocation(self):
+        """Generate realistic geolocation data"""
+        cities = {
+            "US": [
+                {"city": "New York", "lat": 40.7128, "lon": -74.0060, "timezone": "America/New_York"},
+                {"city": "Los Angeles", "lat": 34.0522, "lon": -118.2437, "timezone": "America/Los_Angeles"},
+                {"city": "Chicago", "lat": 41.8781, "lon": -87.6298, "timezone": "America/Chicago"}
+            ],
+            "UK": [
+                {"city": "London", "lat": 51.5074, "lon": -0.1278, "timezone": "Europe/London"}
+            ],
+            "DE": [
+                {"city": "Berlin", "lat": 52.5200, "lon": 13.4050, "timezone": "Europe/Berlin"}
+            ]
+        }
         
+        country = random.choice(list(cities.keys()))
+        location = random.choice(cities[country])
+        
+        return {
+            "latitude": location["lat"],
+            "longitude": location["lon"],
+            "accuracy": random.uniform(10, 100),
+            "country": country,
+            "city": location["city"],
+            "timezone": location["timezone"]
+        }
+    
     def get_random_user_agent(self):
+        """Get a more diverse set of user agents"""
         user_agents = [
+            # Chrome Windows
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+            
+            # Chrome macOS
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
+            
+            # Firefox Windows
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/20100101 Firefox/95.0",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:96.0) Gecko/20100101 Firefox/96.0",
+            
+            # Firefox macOS
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:95.0) Gecko/20100101 Firefox/95.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:96.0) Gecko/20100101 Firefox/96.0",
+            
+            # Safari
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+            
+            # Edge
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62",
         ]
         return random.choice(user_agents)
@@ -52,6 +94,9 @@ class BrowserEngine:
                 
                 self.playwright = sync_playwright().start()
                 
+                # Extract browser version from user agent for more realistic args
+                chrome_version = self._extract_chrome_version(self.user_agent)
+                
                 launch_options = {
                     "headless": self.headless,
                     "args": [
@@ -62,9 +107,8 @@ class BrowserEngine:
                         "--disable-setuid-sandbox",
                         "--disable-dev-shm-usage",
                         "--disable-gpu",
-                        "--disable-software-rasterizer",
                         f"--user-agent={self.user_agent}",
-                        "--lang=en-US,en;q=0.9",
+                        f"--lang={self._get_language_from_ua()}",
                         "--disable-background-timer-throttling",
                         "--disable-backgrounding-occluded-windows",
                         "--disable-renderer-backgrounding",
@@ -75,32 +119,34 @@ class BrowserEngine:
                         "--no-default-browser-check",
                         "--disable-default-apps",
                         "--disable-translate",
+                        f"--window-size={random.randint(1200, 1920)},{random.randint(800, 1080)}",
                     ]
                 }
                 
                 if self.proxy and self.proxy.get("server"):
                     launch_options["proxy"] = self.proxy
-                    # Remove no-proxy-server argument if using a proxy
-                    if "--no-proxy-server" in launch_options["args"]:
-                        launch_options["args"].remove("--no-proxy-server")
                 
                 self.browser = self.playwright.chromium.launch(**launch_options)
                 
-                # Set up context with randomized viewport
-                viewport_width = random.randint(1200, 1920)
-                viewport_height = random.randint(800, 1080)
-                
+                # Set up context with randomized settings
                 context_options = {
-                    "viewport": {"width": viewport_width, "height": viewport_height},
+                    "viewport": {
+                        "width": random.randint(1200, 1920),
+                        "height": random.randint(800, 1080)
+                    },
                     "user_agent": self.user_agent,
-                    "locale": "en-US",
-                    "timezone_id": self.fingerprint.get('timezone', 'America/New_York'),
+                    "locale": self._get_language_from_ua(),
+                    "timezone_id": self.geolocation["timezone"],
+                    "geolocation": {
+                        "latitude": self.geolocation["latitude"],
+                        "longitude": self.geolocation["longitude"],
+                        "accuracy": self.geolocation["accuracy"]
+                    },
                     "permissions": ["geolocation"]
                 }
                 
-                # Set geolocation if available in fingerprint
-                if 'geolocation' in self.fingerprint:
-                    context_options["geolocation"] = self.fingerprint['geolocation']
+                # Set HTTP headers for more realism
+                context_options["extra_http_headers"] = self._generate_http_headers()
                 
                 self.context = self.browser.new_context(**context_options)
                 self.page = self.context.new_page()
@@ -109,7 +155,6 @@ class BrowserEngine:
                 if HAVE_STEALTH:
                     stealth_sync(self.page)
                 else:
-                    # Enhanced stealth injections
                     self._apply_advanced_stealth()
                 
                 # Apply fingerprint overrides
@@ -130,11 +175,48 @@ class BrowserEngine:
                 
                 self.close()
                 
-                # Wait before retry
-                if attempt < retry_count - 1:
-                    time.sleep(random.uniform(2, 5))
-                else:
-                    raise Exception(f"Failed to launch browser after {retry_count} attempts: {e}")
+                # Wait before retry with exponential backoff
+                wait_time = (2 ** attempt) + random.uniform(0, 1)
+                print(f"Waiting {wait_time:.2f} seconds before retry...")
+                time.sleep(wait_time)
+        else:
+            raise Exception(f"Failed to launch browser after {retry_count} attempts")
+    
+    def _extract_chrome_version(self, user_agent):
+        """Extract Chrome version from user agent"""
+        match = re.search(r'Chrome/(\d+\.\d+\.\d+\.\d+)', user_agent)
+        return match.group(1) if match else None
+    
+    def _get_language_from_ua(self):
+        """Extract language from user agent or use fingerprint"""
+        if self.fingerprint.get('language'):
+            return self.fingerprint['language']
+        
+        # Default to English variants based on common user agents
+        languages = ["en-US", "en-GB", "en-CA", "en-AU"]
+        return random.choice(languages)
+    
+    def _generate_http_headers(self):
+        """Generate realistic HTTP headers"""
+        headers = {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': f'{self._get_language_from_ua()},en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': str(random.randint(0, 1)),
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        
+        # Randomly add Sec-Fetch headers (not all browsers have them)
+        if random.random() < 0.7:
+            headers.update({
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+            })
+        
+        return headers
     
     def _apply_advanced_stealth(self):
         """Apply advanced stealth techniques to avoid detection"""
@@ -154,12 +236,24 @@ class BrowserEngine:
 
         // Override plugins
         Object.defineProperty(navigator, 'plugins', {
-            get: () => [1, 2, 3, 4, 5],
+            get: () => [{
+                name: 'Chrome PDF Plugin',
+                filename: 'internal-pdf-viewer',
+                description: 'Portable Document Format'
+            }, {
+                name: 'Chrome PDF Viewer',
+                filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
+                description: ''
+            }, {
+                name: 'Native Client',
+                filename: 'internal-nacl-plugin',
+                description: ''
+            }],
         });
 
         // Override languages
         Object.defineProperty(navigator, 'languages', {
-            get: () => ['en-US', 'en'],
+            get: () => ['%s'],
         });
         
         // Override chrome object
@@ -223,9 +317,9 @@ class BrowserEngine:
         // Mock battery API
         Object.defineProperty(navigator, 'getBattery', {
             get: () => () => Promise.resolve({
-                level: 0.85,
-                charging: true,
-                chargingTime: 1800,
+                level: 0.%d,
+                charging: %s,
+                chargingTime: %d,
                 dischargingTime: Infinity,
             }),
         });
@@ -233,53 +327,21 @@ class BrowserEngine:
         // Mock connection API
         Object.defineProperty(navigator, 'connection', {
             get: () => ({
-                downlink: 10,
-                effectiveType: '4g',
-                rtt: 50,
+                downlink: %d,
+                effectiveType: '%s',
+                rtt: %d,
                 saveData: false,
             }),
         });
-        
-        // Mock device memory
-        Object.defineProperty(navigator, 'deviceMemory', {
-            get: () => 8,
-        });
-        
-        // Mock hardware concurrency
-        Object.defineProperty(navigator, 'hardwareConcurrency', {
-            get: () => 8,
-        });
-        
-        // Mock max touch points
-        Object.defineProperty(navigator, 'maxTouchPoints', {
-            get: () => 0,
-        });
-        
-        // Mock platform
-        Object.defineProperty(navigator, 'platform', {
-            get: () => 'Win32',
-        });
-        
-        // Mock vendor
-        Object.defineProperty(navigator, 'vendor', {
-            get: () => 'Google Inc.',
-        });
-        
-        // Mock product
-        Object.defineProperty(navigator, 'product', {
-            get: () => 'Gecko',
-        });
-        
-        // Mock productSub
-        Object.defineProperty(navigator, 'productSub', {
-            get: () => '20030107',
-        });
-        
-        // Mock appVersion
-        Object.defineProperty(navigator, 'appVersion', {
-            get: () => '5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
-        });
-        """
+        """ % (
+            self._get_language_from_ua(),
+            random.randint(10, 99),
+            str(random.random() < 0.3).lower(),
+            random.randint(1800, 3600),
+            random.uniform(1, 100),
+            random.choice(['4g', '3g', '2g']),
+            random.randint(50, 200)
+        )
         
         self.page.add_init_script(stealth_script)
     

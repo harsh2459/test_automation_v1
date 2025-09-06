@@ -1,0 +1,41 @@
+{
+  "timestamp": "20250906_093644",
+  "session_id": "5ccead062f6e",
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+  "fingerprint": {
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+    "canvas": "geometric-997fd54afa",
+    "webgl": {
+      "vendor": "Google Inc.",
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)",
+      "unmasked_vendor": "Google Inc.",
+      "unmasked_renderer": "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)"
+    },
+    "fonts": [
+      "Arial",
+      "Times New Roman",
+      "Courier New",
+      "Verdana",
+      "Tahoma",
+      "Segoe UI",
+      "Microsoft Sans Serif",
+      "Calibri",
+      "Cambria"
+    ],
+    "audio": {
+      "frequency": 21061.210435220855,
+      "damping": 0.0024686286248500034
+    },
+    "hardwareConcurrency": 8,
+    "deviceMemory": 4,
+    "platform": "MacIntel",
+    "screenWidth": 1706,
+    "screenHeight": 874,
+    "colorDepth": 32,
+    "timezone": "America/New_York",
+    "language": "ja-JP",
+    "session_id": "dd8134f95f59"
+  },
+  "proxy": null,
+  "filename": "screenshots/wallpaper_visit_5ccead062f6e_20250906_093644.png"
+}

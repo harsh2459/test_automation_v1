@@ -1,93 +1,136 @@
 from fingerprint_manager import FingerprintManager
 from core.browser_engine import BrowserEngine
+from human_behavior import AdvancedBehaviorSimulator
 import time
 import random
 from urllib.parse import urlencode
 
-def _simulate_ad_interaction(page, session_id):
-    """Simulate ad interactions with direct API calls to ensure tracking"""
-    # Try to find and click ads with 60% probability
+def _simulate_ad_interaction(page, session_id, behavior_simulator):
+    """Simulate ad interactions with multiple approaches"""
+    interaction_methods = [
+        _click_ad_via_api,
+        _click_ad_via_element,
+        _click_ad_via_javascript
+    ]
+    
+    # Try different methods with weighted probability
+    methods = random.choices(
+        interaction_methods,
+        weights=[0.4, 0.4, 0.2],
+        k=random.randint(1, 3)
+    )
+    
+    for method in methods:
+        try:
+            if method(page, session_id, behavior_simulator):
+                return True
+        except Exception as e:
+            print(f"Ad interaction method failed: {e}")
+            continue
+    
+    return False
+
+def _click_ad_via_api(page, session_id, behavior_simulator):
+    """Click ad via direct API call"""
     if random.random() < 0.6:
-        print("Looking for ads to interact with...")
+        ad_id = random.randint(1, 2)
+        print(f"Directly calling ad click API for ad {ad_id}")
         
-        # Wait for ads to load
+        # Make a direct API call to simulate ad click
+        api_url = f"http://localhost:5000/ad-click?ad_id={ad_id}&session_id={session_id}"
+        page.evaluate(f"""() => {{
+            fetch('{api_url}', {{ method: 'GET' }})
+                .then(response => response.json())
+                .then(data => console.log('Ad click recorded via API:', data));
+        }}""")
+        
+        page.wait_for_timeout(random.randint(1000, 3000))
+        return True
+    return False
+
+def _click_ad_via_element(page, session_id, behavior_simulator):
+    """Click ad by finding and interacting with elements"""
+    if random.random() < 0.7:
+        print("Looking for ad elements to click...")
+        
+        # Wait for page to load completely
         page.wait_for_timeout(2000)
         
-        # Try different approaches to ensure ad clicks are tracked
+        # Try different selectors with priority
+        ad_selectors = [
+            ".btn", "button", "a", "[class*='ad']", "[id*='ad']",
+            "[class*='promo']", "[class*='offer']", "[class*='premium']"
+        ]
         
-        # 1. First try: Directly call the website's ad click API
-        try:
-            ad_id = random.randint(1, 2)
-            print(f"Directly calling ad click API for ad {ad_id}")
-            
-            # Make a direct API call to simulate ad click
-            api_url = f"http://localhost:5000/ad-click?ad_id={ad_id}&session_id={session_id}"
-            page.evaluate(f"""() => {{
-                fetch('{api_url}')
-                    .then(response => response.json())
-                    .then(data => console.log('Ad click recorded:', data));
-            }}""")
-            
-            page.wait_for_timeout(1000)
-            return True
-        except Exception as e:
-            print(f"Direct API call failed: {e}")
-        
-        # 2. Second try: Find and click actual ad elements
-        try:
-            ad_selectors = [".ad", "[class*='ad']", "[id*='ad']", "button", "a"]
-            
-            for selector in ad_selectors:
-                ads = page.query_selector_all(selector)
-                if ads:
-                    # Click a random ad
-                    ad = random.choice(ads)
+        for selector in ad_selectors:
+            ads = page.query_selector_all(selector)
+            if ads:
+                # Filter to only visible ads
+                visible_ads = [ad for ad in ads if ad.is_visible()]
+                if visible_ads:
+                    ad = random.choice(visible_ads)
                     try:
                         print(f"Clicking ad element with selector: {selector}")
-                        ad.click()
+                        
+                        # Use behavior simulator for human-like interaction
+                        behavior_simulator.simulate_element_interaction(page, selector, "click")
+                        
                         page.wait_for_timeout(random.randint(2000, 5000))
                         return True
-                    except:
+                    except Exception as e:
+                        print(f"Failed to click ad element: {e}")
                         continue
-        except Exception as e:
-            print(f"Element clicking failed: {e}")
-        
-        # 3. Third try: Execute the trackAdClick function directly
+        return False
+
+def _click_ad_via_javascript(page, session_id, behavior_simulator):
+    """Click ad by executing JavaScript directly"""
+    if random.random() < 0.3:
         try:
             ad_id = random.randint(1, 2)
             print(f"Executing trackAdClick function for ad {ad_id}")
+            
+            # Execute the trackAdClick function directly
             page.evaluate(f"trackAdClick({ad_id})")
             page.wait_for_timeout(2000)
             return True
         except:
             print("trackAdClick function not found or failed")
-    
+            return False
     return False
 
-def _simulate_wallpaper_interaction(page):
+def _simulate_wallpaper_interaction(page, behavior_simulator):
     """Simulate interaction with wallpaper elements"""
-    # Try to interact with wallpapers
-    wallpaper_selectors = [".wallpaper", "img", "[class*='image']", "[class*='wall']"]
+    interaction_types = ["click", "hover", "scroll"]
     
-    for selector in wallpaper_selectors:
-        wallpapers = page.query_selector_all(selector)
-        if wallpapers:
-            # Interact with a random wallpaper
-            wallpaper = random.choice(wallpapers)
-            try:
-                # Hover over the wallpaper
-                wallpaper.hover()
-                page.wait_for_timeout(1000)
-                
-                # Maybe click on it (33% chance)
-                if random.random() < 0.33:
-                    wallpaper.click()
-                    print("Interacted with a wallpaper")
-                    page.wait_for_timeout(2000)
-                
-                return True
-            except:
-                continue
+    for _ in range(random.randint(1, 3)):
+        try:
+            # Try different selectors
+            selectors = [".wallpaper-card", ".download-btn", "img", "[class*='image']"]
+            
+            for selector in selectors:
+                elements = page.query_selector_all(selector)
+                if elements:
+                    element = random.choice(elements)
+                    if element.is_visible():
+                        action = random.choice(interaction_types)
+                        
+                        if action == "click" and behavior_simulator.simulate_element_interaction(page, selector, "click"):
+                            print(f"Clicked on {selector}")
+                            return True
+                        elif action == "hover":
+                            element.hover()
+                            page.wait_for_timeout(random.randint(500, 1500))
+                            print(f"Hovered on {selector}")
+                            return True
+                        elif action == "scroll":
+                            # Scroll to element
+                            element.scroll_into_view_if_needed()
+                            page.wait_for_timeout(random.randint(500, 1500))
+                            print(f"Scrolled to {selector}")
+                            return True
+        except Exception as e:
+            print(f"Wallpaper interaction failed: {e}")
+            continue
     
     return False
 
@@ -105,6 +148,11 @@ def wallpaper_site_visit():
         user_agent=user_agent,
         fingerprint=fingerprint
     )
+    
+    # Initialize behavior simulator
+    behavior_simulator = AdvancedBehaviorSimulator()
+    behavior_pattern = behavior_simulator.get_random_pattern()
+    print(f"Using behavior pattern: {behavior_pattern}")
     
     try:
         # Launch browser
@@ -124,22 +172,36 @@ def wallpaper_site_visit():
         url_with_params = f"{site_url}?{urlencode(params)}"
         
         print(f"Navigating to: {url_with_params}")
-        page.goto(url_with_params)
+        page.goto(url_with_params, wait_until="networkidle")
         
-        # Simulate human reading time
-        reading_time = random.uniform(3, 8)
-        print(f"Simulating reading time: {reading_time:.2f} seconds")
-        time.sleep(reading_time)
+        # Simulate human reading time based on pattern
+        pattern_settings = behavior_simulator.action_patterns[behavior_pattern]
+        reading_time = random.lognormvariate(
+            pattern_settings["reading_time_mean"], 
+            pattern_settings["reading_time_std"]
+        )
+        
+        # Cap the reading time to a maximum of 5 seconds
+        max_reading_time = 5
+        capped_reading_time = min(reading_time, max_reading_time)
+        
+        print(f"Simulating reading time: {capped_reading_time:.2f} seconds")
+        time.sleep(capped_reading_time)  # Use the capped time
         
         # Enhanced ad clicking simulation
-        ad_clicked = _simulate_ad_interaction(page, session_id)
+        ad_clicked = _simulate_ad_interaction(page, session_id, behavior_simulator)
         if ad_clicked:
             print("Successfully simulated ad interaction")
         else:
             print("No ad interaction simulated")
         
         # Enhanced wallpaper interaction
-        _simulate_wallpaper_interaction(page)
+        wallpaper_interacted = _simulate_wallpaper_interaction(page, behavior_simulator)
+        if wallpaper_interacted:
+            print("Successfully interacted with wallpaper content")
+        
+        # Simulate some scrolling
+        behavior_simulator.simulate_scrolling(page, random.randint(500, 1500))
         
         # Take a screenshot
         screenshot_path = browser_engine.save_screenshot("wallpaper_visit", include_fingerprint=True)
@@ -157,9 +219,16 @@ def run_multiple_visits(num_visits=5, delay_between=30):
     """Run multiple visits to the wallpaper site"""
     for i in range(num_visits):
         print(f"Starting visit {i+1}/{num_visits}")
+        start_time = time.time()
+        
         wallpaper_site_visit()
         
+        visit_duration = time.time() - start_time
+        print(f"Visit completed in {visit_duration:.2f} seconds")
+        
         if i < num_visits - 1:
-            wait_time = random.randint(delay_between // 2, delay_between * 2)
+            # Vary delay based on visit duration and random factor
+            base_delay = max(delay_between, visit_duration * 1.5)
+            wait_time = random.randint(int(base_delay * 0.7), int(base_delay * 1.3))
             print(f"Waiting {wait_time} seconds before next visit...")
             time.sleep(wait_time)
