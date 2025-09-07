@@ -93,123 +93,144 @@ class BrowserEngine:
     @retry_on_failure(max_retries=3, delay=2, backoff=2)
     def launch_browser(self, retry_count=3):
         """Launch browser with advanced stealth and proxy rotation"""
-        for attempt in range(retry_count):
+        # Check if we're in an async environment (moved outside the loop)
+        try:
+          import asyncio
+         if asyncio.get_event_loop().is_running():
+              print("Warning: Running in async environment, this may cause issues with sync Playwright")
+     except:
+         pass
+    
+     for attempt in range(retry_count):
             try:
                 # Check if we're accessing localhost and disable proxy if so
                 if self.target_url and any(domain in self.target_url for domain in ['localhost', '127.0.0.1']):
-                    print("Localhost detected, disabling proxy usage")
+                     print("Localhost detected, disabling proxy usage")
                     self.proxy = None
-                
-                # Rotate proxy if we have a proxy manager
-                if self.proxy_manager and not self.proxy:
-                    self.proxy = self.proxy_manager.get_proxy_for_session(self.session_id)
-                    if not self.proxy:
-                        print("No proxies available, proceeding without proxy")
-                
-                self.playwright = sync_playwright().start()
-                
-                # Extract browser version from user agent for more realistic args
-                chrome_version = self._extract_chrome_version(self.user_agent)
-                
-                launch_options = {
-                    "headless": self.headless,
-                    "args": [
-                        "--disable-blink-features=AutomationControlled",
-                        "--disable-web-security",
-                        "--disable-features=VizDisplayCompositor",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        f"--user-agent={self.user_agent}",
-                        f"--lang={self._get_language_from_ua()}",
-                        "--disable-background-timer-throttling",
-                        "--disable-backgrounding-occluded-windows",
-                        "--disable-renderer-backgrounding",
-                        "--disable-notifications",
-                        "--disable-popup-blocking",
-                        "--metrics-recording-only",
-                        "--no-first-run",
-                        "--no-default-browser-check",
-                        "--disable-default-apps",
-                        "--disable-translate",
-                        f"--window-size={random.randint(1200, 1920)},{random.randint(800, 1080)}",
-                    ]
-                }
-                
-                if self.proxy and self.proxy.get("server"):
-                    launch_options["proxy"] = self.proxy
-                
-                self.browser = self.playwright.chromium.launch(**launch_options)
-                
-                # Set up context with randomized settings
-                context_options = {
-                    "viewport": {
-                        "width": config.get("browser.viewport_width", random.randint(1000, 1920)),
-                        "height": config.get("browser.viewport_height", random.randint(600, 1080))
-                    },
-                    "user_agent": self.user_agent,
-                    "locale": self._get_language_from_ua(),
-                    "timezone_id": self.geolocation["timezone"],
-                    "geolocation": {
-                        "latitude": self.geolocation["latitude"],
-                        "longitude": self.geolocation["longitude"],
-                        "accuracy": self.geolocation["accuracy"]
-                    },
-                    "permissions": ["geolocation"]
-                }
-                
-                storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
-                if os.path.exists(storage_state_path):
-                    context_options["storage_state"] = storage_state_path
-                
-                # Set HTTP headers for more realism
-                context_options["extra_http_headers"] = self._generate_http_headers()
-                
-                self.context = self.browser.new_context(**context_options)
-                self.page = self.context.new_page()
-                
-                # Apply advanced stealth if available
-                if HAVE_STEALTH:
-                    stealth_sync(self.page)
-                else:
-                    self._apply_advanced_stealth()
-                
-                # Apply fingerprint overrides
-                self._apply_fingerprint_overrides()
-                
-                # Simulate network conditions
-                self._simulate_network_conditions()
-                
-                print(f"Browser launched successfully with session ID: {self.session_id}")
-                if self.proxy:
-                    print(f"Using proxy: {self.proxy.get('server', 'Unknown')}")
-                
-                # Log the browser launch
-                monitor.log_event("browser_launched", {
-                    "session_id": self.session_id,
-                    "user_agent": self.user_agent,
-                    "proxy": self.proxy,
-                    "geolocation": self.geolocation
-                })
-                
-                return self.page
-                
-            except Exception as e:
-                print(f"Error launching browser (attempt {attempt + 1}/{retry_count}): {e}")
-                
-                # Update proxy performance if we have a proxy manager
-                if self.proxy_manager and self.proxy:
-                    self.proxy_manager.update_proxy_performance(self.proxy, success=False)
-                
+            
+              # Rotate proxy if we have a proxy manager
+            if self.proxy_manager and not self.proxy:
+                self.proxy = self.proxy_manager.get_proxy_for_session(self.session_id)
+                if not self.proxy:
+                    print("No proxies available, proceeding without proxy")
+            
+            self.playwright = sync_playwright().start()
+            
+            # Extract browser version from user agent for more realistic args
+            chrome_version = self._extract_chrome_version(self.user_agent)
+            
+            launch_options = {
+                "headless": self.headless,
+                "args": [
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-web-security",
+                    "--disable-features=VizDisplayCompositor",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    f"--user-agent={self.user_agent}",
+                    f"--lang={self._get_language_from_ua()}",
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-renderer-backgrounding",
+                    "--disable-notifications",
+                    "--disable-popup-blocking",
+                    "--metrics-recording-only",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-default-apps",
+                    "--disable-translate",
+                    f"--window-size={random.randint(1200, 1920)},{random.randint(800, 1080)}",
+                ]
+            }
+            
+            if self.proxy and self.proxy.get("server"):
+                launch_options["proxy"] = self.proxy
+            
+            self.browser = self.playwright.chromium.launch(**launch_options)
+            
+            # Set up context with randomized settings
+            context_options = {
+                "viewport": {
+                    "width": config.get("browser.viewport_width", random.randint(1000, 1920)),
+                    "height": config.get("browser.viewport_height", random.randint(600, 1080))
+                },
+                "user_agent": self.user_agent,
+                "locale": self._get_language_from_ua(),
+                "timezone_id": self.geolocation["timezone"],
+                "geolocation": {
+                    "latitude": self.geolocation["latitude"],
+                    "longitude": self.geolocation["longitude"],
+                    "accuracy": self.geolocation["accuracy"]
+                },
+                "permissions": ["geolocation"]
+            }
+            
+            storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
+            if os.path.exists(storage_state_path):
+                context_options["storage_state"] = storage_state_path
+            
+            # Set HTTP headers for more realism
+            context_options["extra_http_headers"] = self._generate_http_headers()
+            
+            self.context = self.browser.new_context(**context_options)
+            self.page = self.context.new_page()
+            
+            # Apply advanced stealth if available
+            if HAVE_STEALTH:
+                stealth_sync(self.page)
+            else:
+                self._apply_advanced_stealth()
+            
+            # Apply fingerprint overrides
+            self._apply_fingerprint_overrides()
+            
+            # Simulate network conditions (updated to avoid deprecated method)
+            self._simulate_network_conditions()
+            
+            print(f"Browser launched successfully with session ID: {self.session_id}")
+            if self.proxy:
+                print(f"Using proxy: {self.proxy.get('server', 'Unknown')}")
+            
+            # Log the browser launch
+            monitor.log_event("browser_launched", {
+                "session_id": self.session_id,
+                "user_agent": self.user_agent,
+                "proxy": self.proxy,
+                "geolocation": self.geolocation
+            })
+            
+            return self.page
+            
+        except Exception as e:
+            print(f"Error launching browser (attempt {attempt + 1}/{retry_count}): {e}")
+            
+            # Update proxy performance if we have a proxy manager
+            if self.proxy_manager and self.proxy:
+                self.proxy_manager.update_proxy_performance(self.proxy, success=False)
+            
+            # Make sure close method exists before calling it
+            if hasattr(self, 'close'):
                 self.close()
-                
-                # Wait before retry with exponential backoff
-                wait_time = (2 ** attempt) + random.uniform(0, 1)
-                print(f"Waiting {wait_time:.2f} seconds before retry...")
-                time.sleep(wait_time)
-        else:
-            raise Exception(f"Failed to launch browser after {retry_count} attempts")
+            else:
+                # Basic cleanup if close method doesn't exist yet
+                try:
+                    if hasattr(self, 'context') and self.context:
+                        self.context.close()
+                    if hasattr(self, 'browser') and self.browser:
+                        self.browser.close()
+                    if hasattr(self, 'playwright') and self.playwright:
+                        self.playwright.stop()
+                except Exception as cleanup_error:
+                    print(f"Cleanup error: {cleanup_error}")
+            
+            # Wait before retry with exponential backoff
+            wait_time = (2 ** attempt) + random.uniform(0, 1)
+            print(f"Waiting {wait_time:.2f} seconds before retry...")
+            time.sleep(wait_time)
+    else:
+        raise Exception(f"Failed to launch browser after {retry_count} attempts")  
     
     def _extract_chrome_version(self, user_agent):
         """Extract Chrome version from user agent"""
@@ -406,20 +427,35 @@ class BrowserEngine:
         
         self.page.add_init_script(fingerprint_script)
     
-    def _simulate_network_conditions(self):
-        """Simulate realistic network conditions"""
-        # Only apply network throttling if not in headless mode
-        if not self.headless:
-            conditions = [
-                {"download": 1024, "upload": 512, "latency": 100},  # Regular 3G
-                {"download": 2048, "upload": 1024, "latency": 50},  # Good 3G
-                {"download": 4096, "upload": 2048, "latency": 20},  # Regular 4G
-            ]
-            
-            # Select a random network condition
-            network_condition = random.choice(conditions)
-            self.context.set_offline(False)
-            self.context.emulate_network_conditions(network_condition)
+def _simulate_network_conditions(self):
+    """Network condition simulation - placeholder for future implementation"""
+    # This method is temporarily empty since emulate_network_conditions was deprecated
+    if not self.headless:
+        print("Network simulation would run here (API changed in Playwright)")
+    pass
+
+def close(self):
+    """Properly close browser and cleanup resources"""
+    try:
+        if hasattr(self, 'context') and self.context:
+            # Save session state before closing
+            try:
+                storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
+                self.context.storage_state(path=storage_state_path)
+            except Exception as e:
+                print(f"Error saving storage state: {e}")
+            self.context.close()
+        if hasattr(self, 'browser') and self.browser:
+            self.browser.close()
+        if hasattr(self, 'playwright') and self.playwright:
+            self.playwright.stop()
+    except Exception as e:
+        print(f"Error during browser cleanup: {e}")
+    finally:
+        # Ensure we clear references
+        self.context = None
+        self.browser = None
+        self.playwright = None
     
     def _randomize_geolocation(self):
         """Randomize geolocation for each session"""
@@ -464,19 +500,28 @@ class BrowserEngine:
         
         return filename
     
-    def close(self):
-        try:
-            if self.context:
+def close(self):
+    """Properly close browser and cleanup resources"""
+    try:
+        if hasattr(self, 'context') and self.context:
+            # Save session state before closing
+            try:
                 storage_state_path = self.session_manager.get_storage_state_path(self.session_id)
                 self.context.storage_state(path=storage_state_path)
-                self.context.close()
-            if self.browser:
-                self.browser.close()
-            if self.playwright:
-                self.playwright.stop()
-            
-        except Exception as e:
-             print(f"Error during browser close: {e}")
+            except Exception as e:
+                print(f"Error saving storage state: {e}")
+            self.context.close()
+        if hasattr(self, 'browser') and self.browser:
+            self.browser.close()
+        if hasattr(self, 'playwright') and self.playwright:
+            self.playwright.stop()
+    except Exception as e:
+        print(f"Error during browser cleanup: {e}")
+    finally:
+        # Ensure we clear references
+        self.context = None
+        self.browser = None
+        self.playwright = None
     
     def simulate_human_behavior(self, page=None):
         """Simulate human-like behavior on the page"""
@@ -511,3 +556,43 @@ class BrowserEngine:
                 key = random.choice(["PageDown", "PageUp", "ArrowDown", "ArrowUp"])
                 target_page.keyboard.press(key)
                 time.sleep(random.uniform(0.3, 1.2))
+                
+def _simulate_hardware_level_behavior(self):
+    """Simulate hardware-level characteristics"""
+    hardware_script = """
+    // Advanced hardware simulation
+    const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+        // GPU fingerprint spoofing
+        if (parameter === 37445) return 'Google Inc. (Apple GPU)';
+        if (parameter === 37446) return 'Apple Metal Renderer';
+        return originalGetParameter.call(this, parameter);
+    };
+    
+    // AudioContext fingerprint randomization
+    const originalCreateAnalyser = AudioContext.prototype.createAnalyser;
+    AudioContext.prototype.createAnalyser = function() {
+        const analyser = originalCreateAnalyser.apply(this, arguments);
+        // Add slight variations to audio processing
+        analyser.frequencyBinCount = 1024;
+        return analyser;
+    };
+    """
+    self.page.add_init_script(hardware_script)
+
+def _simulate_network_imperfections(self):
+    """Add network-level imperfections"""
+    network_script = """
+    // Simulate real network conditions
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        // Randomly delay requests (10-200ms)
+        const delay = Math.random() * 190 + 10;
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(originalFetch.apply(this, args));
+            }, delay);
+        });
+    };
+    """
+    self.page.add_init_script(network_script)

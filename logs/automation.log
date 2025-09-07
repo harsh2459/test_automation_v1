@@ -1,2 +1,7 @@
 2025-09-06 17:04:42,609 - AutomationSystem - INFO - total_execution_completed: {"duration": 38.23432993888855}
 2025-09-06 17:05:44,618 - AutomationSystem - INFO - total_execution_completed: {"duration": 41.839672565460205}
+2025-09-07 08:41:02,211 - AutomationSystem - ERROR - wallpaper_visit_failed: {"session_id": null, "duration": 58.08565878868103, "error": "Failed to launch browser after 3 attempts"}
+2025-09-07 08:42:11,566 - AutomationSystem - INFO - total_execution_completed: {"duration": 127.44110178947449}
+2025-09-07 11:24:21,730 - AutomationSystem - ERROR - wallpaper_visit_failed: {"session_id": null, "duration": 22.094621658325195, "error": "'BrowserEngine' object has no attribute 'close'"}
+2025-09-07 11:24:21,756 - AutomationSystem - ERROR - main_execution_error: {"error": "'BrowserEngine' object has no attribute 'close'"}
+2025-09-07 11:24:21,759 - AutomationSystem - INFO - total_execution_completed: {"duration": 22.130821704864502}

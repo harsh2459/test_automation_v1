@@ -328,3 +328,68 @@ class AdvancedBehaviorSimulator:
     def get_random_pattern(self):
         """Get a random behavior pattern"""
         return random.choice(list(self.action_patterns.keys()))
+    
+def simulate_advanced_scrolling(self, page, scroll_amount=None):
+    """More realistic scrolling with variable speed and patterns"""
+    if scroll_amount is None:
+        scroll_amount = random.randint(300, 1200)
+    
+    # Determine scroll direction
+    direction = -1 if random.random() < 0.5 else 1
+    scroll_amount *= direction
+    
+    # Human-like scrolling with variable speed
+    total_scrolled = 0
+    remaining = abs(scroll_amount)
+    
+    while remaining > 0:
+        # Vary chunk size based on remaining distance
+        max_chunk = min(remaining, random.randint(50, 250))
+        chunk = random.randint(10, max_chunk) * (1 if scroll_amount > 0 else -1)
+        
+        # Variable speed based on chunk size
+        speed_factor = 1 - (chunk / 500)  # Larger chunks scroll faster
+        base_delay = random.uniform(0.05, 0.2)
+        delay = base_delay * speed_factor
+        
+        page.evaluate(f"window.scrollBy(0, {chunk})")
+        time.sleep(delay)
+        
+        total_scrolled += chunk
+        remaining = abs(scroll_amount) - abs(total_scrolled)
+        
+        # Occasionally overshoot or undershoot
+        if random.random() < 0.1:
+            correction = random.randint(-50, 50)
+            page.evaluate(f"window.scrollBy(0, {correction})")
+            time.sleep(random.uniform(0.1, 0.3))
+
+def simulate_reading_pattern(self, page, pattern_type="f-shaped"):
+    """Simulate different reading patterns"""
+    viewport = page.viewport_size
+    patterns = {
+        "f-shaped": self._simulate_f_shaped_reading,
+        "linear": self._simulate_linear_reading,
+        "thorough": self._simulate_thorough_reading,
+        "detailed": self._simulate_detailed_reading
+    }
+    
+    pattern_func = patterns.get(pattern_type, self._simulate_f_shaped_reading)
+    pattern_func(page, viewport)
+
+def _simulate_f_shaped_reading(self, page, viewport):
+    """Simulate F-shaped reading pattern"""
+    # Horizontal eye movement across top
+    for x in range(0, viewport["width"], random.randint(50, 100)):
+        page.mouse.move(x, random.randint(50, 150))
+        time.sleep(random.uniform(0.05, 0.15))
+    
+    # Second horizontal movement further down
+    for x in range(0, viewport["width"], random.randint(70, 120)):
+        page.mouse.move(x, random.randint(200, 300))
+        time.sleep(random.uniform(0.07, 0.12))
+    
+    # Vertical scan down left side
+    for y in range(150, viewport["height"], random.randint(30, 60)):
+        page.mouse.move(random.randint(50, 150), y)
+        time.sleep(random.uniform(0.08, 0.14))

@@ -142,6 +142,12 @@ def _simulate_wallpaper_interaction(page, behavior_simulator):
 def wallpaper_site_visit(use_proxy=True, session_id=None):
     print("Starting wallpaper site visit task...")
     monitor.start_timer("wallpaper_visit")
+    # Initialize new components
+    from core.environment_simulator import EnvironmentSimulator
+    from utils.network_obfuscator import NetworkObfuscator
+    
+    env_simulator = EnvironmentSimulator()
+    network_obfuscator = NetworkObfuscator()
     
     # Initialize session manager
     session_manager = SessionManager()
@@ -199,6 +205,21 @@ def wallpaper_site_visit(use_proxy=True, session_id=None):
         session_id = browser_engine.session_id
         print(f"Using session ID: {session_id}")
         print(f"Using fingerprint: {fingerprint['session_id']}")
+        
+        # Generate environmental context
+        environmental_context = env_simulator.generate_environmental_context(fingerprint)
+        print(f"Environmental context: {environmental_context['geographic_profile']['interaction_style']}")
+        
+        # Enhanced browsing with environmental context
+        behavior_simulator.simulate_natural_browsing(
+            page, url_with_params, session_id, environmental_context
+        )
+        
+        # More realistic ad interaction with network timing
+        ad_clicked = _simulate_ad_interaction(
+            page, session_id, behavior_simulator, network_obfuscator
+        )
+        
         if proxy:
             print(f"Using proxy: {proxy.get('server', 'Unknown')}")
         else:
